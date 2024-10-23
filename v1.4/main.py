@@ -23,6 +23,8 @@ cell_size = 80
 black = (0, 0, 0)
 white = (255, 255, 255)
 red = (255, 0, 0)
+blue = (0, 0, 255)
+green = (0, 255,0)
 
 # Crear la pantalla
 screen = pygame.display.set_mode(size)
@@ -46,10 +48,12 @@ sonido_casa = pygame.mixer.Sound('sounds/construir_casa.wav')
 sonido_calle = pygame.mixer.Sound('sounds/construir_calle.wav')
 sonido_tornado = pygame.mixer.Sound('sounds/tornado.wav')
 sonido_perder = pygame.mixer.Sound('sounds/game_over.wav')
+sonido_terremoto = pygame.mixer.Sound('sounds/terremoto.wav')
+sonido_ganar = pygame.mixer.Sound('sounds/win.wav')
 
 # Cargar la música de fondo
 pygame.mixer.music.load('sounds/theme.mp3')
-pygame.mixer.music.set_volume(0.5)  # Ajustar el volumen de la música
+pygame.mixer.music.set_volume(0.2)  # Ajustar el volumen de la música
 pygame.mixer.music.play(-1)  # Reproducir la música en bucle (-1 para bucle infinito)
 
 # Generar la grilla con menos bloques de agua
@@ -75,6 +79,7 @@ ultimo_tornado = pygame.time.get_ticks()
 mensaje_mostrar_hasta = 0
 frame_index_general = 0
 ultimo_cambio_frame_general = pygame.time.get_ticks()
+
 
 # Función para dibujar la grilla
 def dibujar_grilla(screen, grilla, dinero, mensaje, fecha, tiempo_actual):
@@ -102,7 +107,7 @@ def dibujar_grilla(screen, grilla, dinero, mensaje, fecha, tiempo_actual):
             pygame.draw.rect(screen, black, rect, 1)
     
     font = pygame.font.Font(None, 36)
-    dinero_text = font.render(f"Dinero: ${dinero}", True, white)
+    dinero_text = font.render(f"Dinero: ${dinero}", True, green)
     screen.blit(dinero_text, (10, height - 100))
     
     
@@ -114,7 +119,7 @@ def dibujar_grilla(screen, grilla, dinero, mensaje, fecha, tiempo_actual):
     controles_text = font.render("[1]-Casa($50) [2]-Calle($30) [3]-Demoler($100)", True, white)
     screen.blit(controles_text, (10, height - 70))
 
-    fecha_text = font.render(fecha.strftime("Fecha: %d/%m/%Y Hora: %H:%M"), True, white)
+    fecha_text = font.render(fecha.strftime("OBJETIVO: $2000                Fecha: %d/%m/%Y Hora: %H:%M"), True, white)
     screen.blit(fecha_text, (10, height - 40))
 
 def hay_calle_adyacente(grilla, row, col):
@@ -125,6 +130,19 @@ def hay_calle_adyacente(grilla, row, col):
             if grilla[nr][nc] == 'S':
                 return True
     return False
+
+def evento_terremoto():
+    global grilla, dinero, mensaje, mensaje_mostrar_hasta
+    num_casas_terremoto = random.randint(1, 15)  # Número aleatorio de casas afectadas por el terremoto
+    casas = [(r, c) for r, fila in enumerate(grilla) for c, letra in enumerate(fila) if letra == 'C']
+    for _ in range(num_casas_terremoto):
+        if casas:
+            row, col = random.choice(casas)
+            grilla[row][col] = 'T'
+            casas.remove((row, col))
+    dinero -= num_casas_terremoto * 10 #costo de perder una casa
+    sonido_terremoto.play()
+
 
 mensaje = ""
 reloj = pygame.time.Clock()
@@ -185,6 +203,7 @@ while True:
             dinero += fila.count('C') * 10
         ultimo_ingreso = tiempo_actual
 
+
     if tiempo_actual - ultimo_tornado > 30000:
         sonido_tornado.play()
         for i in range(random.randint(1, 10)):
@@ -198,6 +217,15 @@ while True:
         mensaje_mostrar_hasta = tiempo_actual + 5000
         ultimo_tornado = tiempo_actual
 
+        
+    if random.randint(0, 1500) == 1 and tiempo_actual >= 60000: #probabilidad de terremoto
+        evento_terremoto()
+        mensaje = "¡Terremoto! ¡Las casas vuelven a ser tierra!"
+        mensaje_mostrar_hasta = tiempo_actual + 5000
+        
+        
+
+    
     fecha += timedelta(minutes=1)
     
     screen.fill(black)
@@ -207,14 +235,27 @@ while True:
     reloj.tick(60)
 
     if dinero <= 0:
-        
         screen.fill(red)
         font = pygame.font.Font(None, 74)
         sonido_casa.stop()
         sonido_perder.play()
+        
         game_over_text = font.render("  GAME OVER", True, white)
         screen.blit(game_over_text, (width//4, height//2 - 40))
         pygame.display.flip()
         pygame.time.wait(3000)
         pygame.quit()
         sys.exit()
+    if dinero >= 2000:
+        screen.fill(blue)
+        font = pygame.font.Font(None, 74)
+        sonido_casa.stop()
+        sonido_ganar.play()
+        pygame.mixer.music.stop()
+        win_text = font.render("    ¡GANASTE!", True, white)
+        screen.blit(win_text, (width//4, height//2 - 40))
+        pygame.display.flip()
+        pygame.time.wait(5000)
+        pygame.quit()
+        sys.exit()
+
