@@ -2,26 +2,55 @@ import pygame
 import sys
 import random
 from datetime import datetime, timedelta
+import pygame.mixer
 
 # Inicializar pygame
 pygame.init()
+pygame.display.set_caption('SimuCities 2000')
+
+#icono = pygame.image.load('ruta/al/icono.ico')
+#pygame.display.set_icon(icono)
+
+# Inicializar el mezclador de sonido
+pygame.mixer.init()
+
 
 # Dimensiones de la pantalla
-size = width, height = 800, 900  # Aumenté la altura para tener espacio para el texto
+size = width, height = 800, 900
 cell_size = 80
 
 # Colores
 black = (0, 0, 0)
 white = (255, 255, 255)
-blue = (0, 0, 255)
-brown = (139, 69, 19)
-yellow = (255, 255, 0)
-grey = (128, 128, 128)
 red = (255, 0, 0)
-orange = (255, 165, 0)
 
 # Crear la pantalla
 screen = pygame.display.set_mode(size)
+
+# Cargar los fotogramas de la animación desde la carpeta 'frames'
+frames_tierra = [pygame.image.load(f'frames/tierra_frame_{i}.png') for i in range(1, 6)]
+frames_agua = [pygame.image.load(f'frames/agua_frame_{i}.png') for i in range(1, 6)]
+frames_casa = [pygame.image.load(f'frames/casa_frame_{i}.png') for i in range(1, 6)]
+frames_calle = [pygame.image.load(f'frames/calle_frame_{i}.png') for i in range(1, 6)]
+frames_obra = [pygame.image.load(f'frames/obra_frame_{i}.png') for i in range(1, 11)]  # 10 fotogramas
+
+# Redimensionar las imágenes
+frames_tierra = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_tierra]
+frames_agua = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_agua]
+frames_casa = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_casa]
+frames_calle = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_calle]
+frames_obra = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_obra]
+
+# Cargar los efectos de sonido
+sonido_casa = pygame.mixer.Sound('sounds/construir_casa.wav')
+sonido_calle = pygame.mixer.Sound('sounds/construir_calle.wav')
+sonido_tornado = pygame.mixer.Sound('sounds/tornado.wav')
+sonido_perder = pygame.mixer.Sound('sounds/game_over.wav')
+
+# Cargar la música de fondo
+pygame.mixer.music.load('sounds/theme.mp3')
+pygame.mixer.music.set_volume(0.5)  # Ajustar el volumen de la música
+pygame.mixer.music.play(-1)  # Reproducir la música en bucle (-1 para bucle infinito)
 
 # Generar la grilla con menos bloques de agua
 def generar_grilla():
@@ -29,66 +58,65 @@ def generar_grilla():
     for _ in range(10):
         fila = []
         for _ in range(10):
-            letra = 'T' if random.random() < 0.8 else 'A'  # 80% tierra, 20% agua
+            letra = 'T' if random.random() < 0.8 else 'A'
             fila.append(letra)
         grilla.append(fila)
     return grilla
 
 grilla = generar_grilla()
 dinero = 1000
-modo = 'casa'  # Por defecto, construye casa
-fecha = datetime(1993, 1, 1, 0, 0)  # Fecha inicial
+modo = 'casa'
+fecha = datetime(1993, 1, 1, 0, 0)
 
 # Mantener un registro del tiempo de construcción y ganancias
 obras = {}
 ultimo_ingreso = pygame.time.get_ticks()
 ultimo_tornado = pygame.time.get_ticks()
 mensaje_mostrar_hasta = 0
+frame_index_general = 0
+ultimo_cambio_frame_general = pygame.time.get_ticks()
 
 # Función para dibujar la grilla
 def dibujar_grilla(screen, grilla, dinero, mensaje, fecha, tiempo_actual):
+    global frame_index_general, ultimo_cambio_frame_general
+    
+    if tiempo_actual - ultimo_cambio_frame_general > 1000:
+        frame_index_general = (frame_index_general + 1) % len(frames_tierra)
+        ultimo_cambio_frame_general = tiempo_actual
+    
     for i, fila in enumerate(grilla):
         for j, letra in enumerate(fila):
             rect = pygame.Rect(j * cell_size, i * cell_size, cell_size, cell_size)
             if letra == 'A':
-                color_fondo = blue
+                screen.blit(frames_agua[frame_index_general], rect.topleft)
             elif letra == 'T':
-                color_fondo = brown
+                screen.blit(frames_tierra[frame_index_general], rect.topleft)
             elif letra == 'C':
-                color_fondo = yellow
+                screen.blit(frames_casa[frame_index_general], rect.topleft)
             elif letra == 'S':
-                color_fondo = grey
-            elif letra == 'O':  # Obra en construcción
-                color_fondo = orange
-            else:
-                color_fondo = black
-            pygame.draw.rect(screen, color_fondo, rect)
+                screen.blit(frames_calle[frame_index_general], rect.topleft)
+            elif letra == 'O':
+                inicio = obras.get((i, j), tiempo_actual)
+                frame_index_obra = ((tiempo_actual - inicio) // 1000) % len(frames_obra)
+                screen.blit(frames_obra[frame_index_obra], rect.topleft)
             pygame.draw.rect(screen, black, rect, 1)
-            font = pygame.font.Font(None, 74)
-            text = font.render(letra, True, white)
-            text_rect = text.get_rect(center=rect.center)
-            screen.blit(text, text_rect.topleft)
     
-    # Mostrar el dinero restante
     font = pygame.font.Font(None, 36)
     dinero_text = font.render(f"Dinero: ${dinero}", True, white)
     screen.blit(dinero_text, (10, height - 100))
     
-    # Mostrar el mensaje y aplicar fade out después de 5 segundos
+    
     if mensaje and tiempo_actual <= mensaje_mostrar_hasta:
         alpha = int(255 * (mensaje_mostrar_hasta - tiempo_actual) / 5000)
         mensaje_text = font.render(mensaje, True, (red[0], red[1], red[2], alpha))
         screen.blit(mensaje_text, (10, height - 130))
 
-    # Mostrar los controles del juego
-    controles_text = font.render("Controles: 1 - Construir Casa ($50), 2 - Construir Calle ($30)", True, white)
+    controles_text = font.render("[1]-Casa($50) [2]-Calle($30) [3]-Demoler($100)", True, white)
     screen.blit(controles_text, (10, height - 70))
 
-    # Mostrar la fecha y hora
     fecha_text = font.render(fecha.strftime("Fecha: %d/%m/%Y Hora: %H:%M"), True, white)
     screen.blit(fecha_text, (10, height - 40))
 
-# Función para verificar si hay una calle adyacente
 def hay_calle_adyacente(grilla, row, col):
     direcciones = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     for dr, dc in direcciones:
@@ -98,7 +126,6 @@ def hay_calle_adyacente(grilla, row, col):
                 return True
     return False
 
-# Bucle principal del juego
 mensaje = ""
 reloj = pygame.time.Clock()
 while True:
@@ -110,40 +137,57 @@ while True:
             x, y = event.pos
             row = y // cell_size
             col = x // cell_size
+            
+            #MODOS DE JUGADOR
+            
             if modo == 'casa':
                 if grilla[row][col] == 'T' and hay_calle_adyacente(grilla, row, col):
                     grilla[row][col] = 'O'
                     obras[(row, col)] = pygame.time.get_ticks()
+                    sonido_casa.stop()
+                    sonido_casa.play()  
                     dinero -= 50
                     mensaje = ""
                 else:
                     mensaje = "¡Debe haber una calle adyacente para construir una casa!"
-            elif modo == 'calle' and grilla[row][col] == 'T':
+                    mensaje_mostrar_hasta = tiempo_actual + 3000
+            elif modo == 'calle' and grilla[row][col] == 'T': 
                 grilla[row][col] = 'S'
+                sonido_calle.stop()
+                sonido_calle.play()  
                 dinero -= 30
                 mensaje = ""
+            elif modo == 'demoler' and grilla[row][col] == 'C':
+                grilla[row][col] = 'T'
+                sonido_calle.stop()
+                sonido_calle.play()  
+                dinero -= 100
+                mensaje = ""
+        
+        #TECLAS DE LOS MODOS
+
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_1:
                 modo = 'casa'
             elif event.key == pygame.K_2:
                 modo = 'calle'
+            elif event.key == pygame.K_3:
+                modo = 'demoler'
 
-    # Actualizar las obras en construcción
     tiempo_actual = pygame.time.get_ticks()
     for (row, col), inicio in list(obras.items()):
-        if tiempo_actual - inicio > 10000:  # 10 segundos
+        if tiempo_actual - inicio > 10000:
             grilla[row][col] = 'C'
             del obras[(row, col)]
 
-    # Generar ingresos cada 5 segundos por cada casa
     if tiempo_actual - ultimo_ingreso > 5000:
         for fila in grilla:
             dinero += fila.count('C') * 10
         ultimo_ingreso = tiempo_actual
 
-    # Evento de tornado cada 30 segundos
     if tiempo_actual - ultimo_tornado > 30000:
-        for i in range(random.randint(1, 10)):  # El tornado afecta entre 1 y 10 casas
+        sonido_tornado.play()
+        for i in range(random.randint(1, 10)):
             casas = [(r, c) for r, fila in enumerate(grilla) for c, letra in enumerate(fila) if letra == 'C']
             if casas:
                 row, col = random.choice(casas)
@@ -154,21 +198,21 @@ while True:
         mensaje_mostrar_hasta = tiempo_actual + 5000
         ultimo_tornado = tiempo_actual
 
-    # Actualizar la fecha y hora
     fecha += timedelta(minutes=1)
     
     screen.fill(black)
     dibujar_grilla(screen, grilla, dinero, mensaje, fecha, tiempo_actual)
     pygame.display.flip()
     
-    # Limitar la velocidad del juego a 60 fps
     reloj.tick(60)
 
-    # Verificar si el dinero llegó a $0
     if dinero <= 0:
+        
         screen.fill(red)
         font = pygame.font.Font(None, 74)
-        game_over_text = font.render("¡Juego Terminado!", True, white)
+        sonido_casa.stop()
+        sonido_perder.play()
+        game_over_text = font.render("  GAME OVER", True, white)
         screen.blit(game_over_text, (width//4, height//2 - 40))
         pygame.display.flip()
         pygame.time.wait(3000)
