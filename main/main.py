@@ -4,7 +4,7 @@ import random
 from datetime import datetime, timedelta
 import pygame.mixer
 
-# Inicializar pygame
+# Inicializar pygame 
 pygame.init()
 pygame.display.set_caption('SimuCities 2000')
 
@@ -281,8 +281,8 @@ while True:
         
         pygame.mixer.music.stop()
         sonido_casa.stop()
-        sonido_tornado.stop()
-        sonido_terremoto.stop()
+        #sonido_tornado.stop()
+        #sonido_terremoto.stop()
         sonido_perder.play()
         
         game_over_text = font.render("  GAME OVER", True, white)
