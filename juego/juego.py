@@ -18,8 +18,8 @@ class Juego:
         for row in range(10):
             fila = []
             for col in range(10):
-                letra = 'T' if random.random() < 0.8 else 'A'
-                fila.append(Celda(row, col, letra))
+                celda = Celda(row, col, 'T') if random.random() < 0.8 else Celda(row, col, 'A')
+                fila.append(celda)
             grilla.append(fila)
         return grilla
 
@@ -38,5 +38,12 @@ class Juego:
                     return True
         return False
 
-    #def actualizar_celda(self, row, col, tipo, dinero):
-    #    self.grilla[row][col].
+    def asignar_celda(self, row, col, celda):
+        self.grilla[row][col] = celda
+
+    def cambiar_estado(self, row, col, tipo, dinero):
+        if self.grilla[row][col].cambiar_estado(tipo):
+            self.dinero += dinero
+            return True
+
+        return False

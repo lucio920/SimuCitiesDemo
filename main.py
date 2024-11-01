@@ -158,6 +158,9 @@ while True:
             #MODOS DE JUGADOR
 
             if juego.modo == 'casa':
+                # if juego.cambiar_estado(row, col, 'C', -50):
+                #    sonido_casa.stop()
+                #    sonido_casa.play()
                 if juego.grilla[row][col].tipo == 'T' and hay_calle_adyacente(juego.grilla, row, col):
                     juego.grilla[row][col].tipo = 'O'
                     obras[(row, col)] = pygame.time.get_ticks()
