@@ -1,6 +1,8 @@
 from datetime import datetime
 import random
 
+from juego.celda import Celda
+
 
 class Juego:
 
@@ -13,13 +15,28 @@ class Juego:
 
     def generar_grilla(self):
         grilla = []
-        for _ in range(10):
+        for row in range(10):
             fila = []
-            for _ in range(10):
+            for col in range(10):
                 letra = 'T' if random.random() < 0.8 else 'A'
-                fila.append(letra)
+                fila.append(Celda(row, col, letra))
             grilla.append(fila)
         return grilla
 
     def actualizar_tiempo(self, tiempo):
         self.tiempo_actual = tiempo
+
+    def actualizar_fecha(self, delta):
+        self.fecha += delta
+
+    def hay_calle_adyacente(self, row, col):
+        direcciones = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        for dr, dc in direcciones:
+            nr, nc = row + dr, col + dc
+            if 0 <= nr < len(self.grilla) and 0 <= nc < len(self.grilla[0]):
+                if self.grilla[nr][nc] == 'S':
+                    return True
+        return False
+
+    #def actualizar_celda(self, row, col, tipo, dinero):
+    #    self.grilla[row][col].
