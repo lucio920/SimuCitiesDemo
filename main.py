@@ -1,37 +1,38 @@
+from enum import Enum
+
 import pygame
 import sys
-import random
-from datetime import datetime, timedelta
+from datetime import timedelta
 import pygame.mixer
 
-from juego.juego import Juego
+from game.cell import Water, Construction, Road, Land, House
+from game.game import Game
 
-# Inicializar pygame
+############################################################
+#                       UI setup                           #
+############################################################
 pygame.init()
 pygame.display.set_caption('SimuCities 2000')
 
-#icono = pygame.image.load('ruta/al/icono.ico')
-#pygame.display.set_icon(icono)
-
-# Inicializar el mezclador de sonido
+# Audio
 pygame.mixer.init()
 
+# Window and cell size
+window_size = width, height = 800, 900
+cell_size = 80 # TODO: ajustar cell_size para redimensionar ventana.
 
-# Dimensiones de la pantalla
-size = width, height = 800, 900
-cell_size = 80
-
+# TODO: pasar a constantes
 # Colores
 black = (0, 0, 0)
 white = (255, 255, 255)
 red = (255, 0, 0)
 blue = (0, 0, 255)
 green = (0, 255,0)
-bluer = (2, 147, 250)
+light_blue = (2, 147, 250)
 grey = (43, 56, 77)
 
-# Crear la pantalla
-screen = pygame.display.set_mode(size)
+# Screen
+screen = pygame.display.set_mode(window_size)
 screen.fill(white)
 font = pygame.font.Font(None, 74)
 font2 = pygame.font.Font(None, 30)
@@ -41,248 +42,201 @@ screen.blit(title, (width//4.5, height//2 - 40))
 screen.blit(subtitle, (width//4.4, height//1.9))
 pygame.display.flip()
 
+# Frames load
+frames_land = [pygame.image.load(f'frames/tierra_frame_{i}.png') for i in range(1, 6)]
+frames_water = [pygame.image.load(f'frames/agua_frame_{i}.png') for i in range(1, 6)]
+frames_house = [pygame.image.load(f'frames/casa_frame_{i}.png') for i in range(1, 6)]
+frames_road = [pygame.image.load(f'frames/calle_frame_{i}.png') for i in range(1, 6)]
+frames_construction = [pygame.image.load(f'frames/obra_frame_{i}.png') for i in range(1, 11)]
 
-# Cargar los fotogramas de la animación desde la carpeta 'frames'
-frames_tierra = [pygame.image.load(f'frames/tierra_frame_{i}.png') for i in range(1, 6)]
-frames_agua = [pygame.image.load(f'frames/agua_frame_{i}.png') for i in range(1, 6)]
-frames_casa = [pygame.image.load(f'frames/casa_frame_{i}.png') for i in range(1, 6)]
-frames_calle = [pygame.image.load(f'frames/calle_frame_{i}.png') for i in range(1, 6)]
-frames_obra = [pygame.image.load(f'frames/obra_frame_{i}.png') for i in range(1, 11)]  # 10 fotogramas
+# Sound effects load
+sound_house = pygame.mixer.Sound('sounds/construir_casa.wav')
+sound_road = pygame.mixer.Sound('sounds/construir_calle.wav')
+sound_tornado = pygame.mixer.Sound('sounds/tornado.wav')
+sound_game_over = pygame.mixer.Sound('sounds/game_over.wav')
+sound_earthquake = pygame.mixer.Sound('sounds/terremoto.wav')
+sound_win = pygame.mixer.Sound('sounds/win.wav')
 
-# Redimensionar las imágenes
-frames_tierra = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_tierra]
-frames_agua = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_agua]
-frames_casa = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_casa]
-frames_calle = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_calle]
-frames_obra = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_obra]
-
-# Cargar los efectos de sonido
-sonido_casa = pygame.mixer.Sound('sounds/construir_casa.wav')
-sonido_calle = pygame.mixer.Sound('sounds/construir_calle.wav')
-sonido_tornado = pygame.mixer.Sound('sounds/tornado.wav')
-sonido_perder = pygame.mixer.Sound('sounds/game_over.wav')
-sonido_terremoto = pygame.mixer.Sound('sounds/terremoto.wav')
-sonido_ganar = pygame.mixer.Sound('sounds/win.wav')
-
-# Cargar la música de fondo
+# Music load
 pygame.mixer.music.load('sounds/theme.mp3')
-pygame.mixer.music.set_volume(0.2)  # Ajustar el volumen de la música
-pygame.mixer.music.play(-1)  # Reproducir la música en bucle (-1 para bucle infinito)
+pygame.mixer.music.set_volume(0.2)
+pygame.mixer.music.play(-1)
 
-## JUEGO
-juego = Juego(1000, 'casa', datetime(1993, 1, 1, 0, 0))
+# Frames resize
+frames_land = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_land]
+frames_water = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_water]
+frames_house = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_house]
+frames_road = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_road]
+frames_construction = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_construction]
 
-# Mantener un registro del tiempo de construcción y ganancias
-obras = {}
-ultimo_ingreso = pygame.time.get_ticks()
-ultimo_tornado = pygame.time.get_ticks()
-mensaje_mostrar_hasta = 0
-frame_index_general = 0
-ultimo_cambio_frame_general = pygame.time.get_ticks()
-
-
-# Función para dibujar la grilla
-def dibujar_grilla(screen, grilla, dinero, mensaje, fecha, tiempo_actual):
+## TODO MEJORAR
+# Game window drawing function
+def draw_game(screen, grid, money, date, current_time, constructions, message):
     global frame_index_general, ultimo_cambio_frame_general
 
-    if tiempo_actual - ultimo_cambio_frame_general > 1000:
-        frame_index_general = (frame_index_general + 1) % len(frames_tierra)
-        ultimo_cambio_frame_general = tiempo_actual
+    if current_time - ultimo_cambio_frame_general > 1000:
+        frame_index_general = (frame_index_general + 1) % len(frames_land)
+        ultimo_cambio_frame_general = current_time
 
-    for i, fila in enumerate(grilla):
+    for i, fila in enumerate(grid):
         for j, celda in enumerate(fila):
             rect = pygame.Rect(j * cell_size, i * cell_size, cell_size, cell_size)
-            if celda.tipo == 'A':
-                screen.blit(frames_agua[frame_index_general], rect.topleft)
-            elif celda.tipo == 'T':
-                screen.blit(frames_tierra[frame_index_general], rect.topleft)
-            elif celda.tipo == 'C':
-                screen.blit(frames_casa[frame_index_general], rect.topleft)
-            elif celda.tipo == 'S':
-                screen.blit(frames_calle[frame_index_general], rect.topleft)
-            elif celda.tipo == 'O':
-                inicio = obras.get((i, j), tiempo_actual)
-                frame_index_obra = ((tiempo_actual - inicio) // 1000) % len(frames_obra)
-                screen.blit(frames_obra[frame_index_obra], rect.topleft)
+            if isinstance(celda, Water):
+                screen.blit(frames_water[frame_index_general], rect.topleft)
+            elif isinstance(celda, Land):
+                screen.blit(frames_land[frame_index_general], rect.topleft)
+            elif isinstance(celda, House):
+                screen.blit(frames_house[frame_index_general], rect.topleft)
+            elif isinstance(celda, Road):
+                screen.blit(frames_road[frame_index_general], rect.topleft)
+            elif isinstance(celda, Construction):
+                # TODO: fix the bug, only 8 frames are showed.
+                # This func gets executed 60 times per second. Each second in real life is 1 hour in game time.
+                # This means that each time this function gets called, one minute has passed
+                # There are 10 frames for a construction site. For simplicity, the sites turn into houses in 10 hours.
+                start_date = constructions.get((i, j), date)
+                frame_index_obra = min(int((date - start_date).total_seconds()/3600), len(frames_construction) - 1)
+                print(frame_index_obra)
+                screen.blit(frames_construction[frame_index_obra], rect.topleft)
             pygame.draw.rect(screen, black, rect, 1)
 
     font = pygame.font.Font(None, 36)
-    dinero_text = font.render(f"Dinero: ${dinero}", True, green)
+    dinero_text = font.render(f"Dinero: ${money}", True, green)
     screen.blit(dinero_text, (10, height - 100))
 
 
-    if mensaje and tiempo_actual <= mensaje_mostrar_hasta:
-        alpha = int(255 * (mensaje_mostrar_hasta - tiempo_actual) / 5000)
-        mensaje_text = font.render(mensaje, True, (bluer[0], bluer[1], bluer[2], alpha),grey)
+    if mensaje and current_time <= mensaje_mostrar_hasta:
+        alpha = int(255 * (mensaje_mostrar_hasta - current_time) / 5000)
+        mensaje_text = font.render(mensaje, True, (light_blue[0], light_blue[1], light_blue[2], alpha),grey)
         screen.blit(mensaje_text, (10, height - 130))
 
     controles_text = font.render("[1]-Casa($50)     [2]-Calle($30)      [3]-Demoler($100)   [R]-Reiniciar", True, white)
     screen.blit(controles_text, (10, height - 70))
 
-    fecha_text = font.render(fecha.strftime("OBJETIVO: $2000    Fecha: %d/%m/%Y Hora: %H:%M"), True, white)
+    fecha_text = font.render(date.strftime("OBJETIVO: $2000    Fecha: %d/%m/%Y Hora: %H:%M"), True, white)
     screen.blit(fecha_text, (10, height - 40))
 
-def hay_calle_adyacente(grilla, row, col):
-    direcciones = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    for dr, dc in direcciones:
-        nr, nc = row + dr, col + dc
-        if 0 <= nr < len(grilla) and 0 <= nc < len(grilla[0]):
-            if grilla[nr][nc].tipo == 'S':
-                return True
-    return False
+# End game window function
+def game_end(color, hang_time, message):
+    screen.fill(color)
+    font = pygame.font.Font(None, 74)
 
-def evento_terremoto():
-    global grilla, dinero, mensaje, mensaje_mostrar_hasta
-    num_casas_terremoto = random.randint(1, 15)  # Número aleatorio de casas afectadas por el terremoto
-    casas = [(r, c) for r, fila in enumerate(grilla) for c, letra in enumerate(fila) if letra == 'C']
-    for _ in range(num_casas_terremoto):
-        if casas:
-            row, col = random.choice(casas)
-            juego.grilla[row][col].tipo = 'T'
-            casas.remove((row, col))
-    dinero -= num_casas_terremoto * 10 #costo de perder una casa
-    sonido_terremoto.play()
+    pygame.mixer.music.stop()
+    sound_house.stop()
+    sound_tornado.stop()
+    sound_earthquake.stop()
+    sound_game_over.play()
 
-mensaje = ""
-reloj = pygame.time.Clock()
+    game_over_text = font.render(message, True, white)
+    screen.blit(game_over_text, (width // 4, height // 2 - 40))
+    pygame.display.flip()
+    pygame.time.wait(hang_time)
+    pygame.quit()
+    sys.exit()
+
+############################################################
+#                       Game setup                         #
+############################################################
+game = Game()
+
+# Build modes
+BuildMode = Enum('BuildMode', ['HOUSE', 'ROAD', 'DEMOLISH'])
+build_mode = BuildMode.HOUSE # Default mode
+
+# Mantener un registro del tiempo de construcción y ganancias
+ultimo_tornado = pygame.time.get_ticks()
+mensaje_mostrar_hasta = 0
+frame_index_general = 0
+mensaje = ''
+ultimo_cambio_frame_general = pygame.time.get_ticks()
+
+
+############################################################
+#                    Main game loop                        #
+############################################################
+clk = pygame.time.Clock()
 while True:
+    ################# UPDATES GAME DATE #####################
+    # The loop ticks at about 60 times per second. So it's 1 hour in game time per second in real time.
+    game.updateGameState(timedelta(minutes=1))
+
+    current_time = pygame.time.get_ticks()
+
+    ################### NATURAL DISASTERS CHECK ##############################
+    if game.hasTornadoPassed():
+        sound_tornado.play()
+        mensaje = "¡Un tornado ha pasado y algunas casas han vuelto a ser obras!"
+        mensaje_mostrar_hasta = current_time + 5000
+
+    if game.hasEarthquakePassed():
+        sound_earthquake.play()
+        mensaje = "¡Terremoto! ¡Las casas vuelven a ser tierra!"
+        mensaje_mostrar_hasta = current_time + 5000
+
+    ##################  UPDATES SCREEEEN ##########################
+    screen.fill(grey)
+    (grid, money, date, constructions) = game.getGameData()
+    draw_game(screen, grid, money, date, current_time, constructions, mensaje)
+    pygame.display.flip()
+
+    ######################## GAME FINISH CHECKS ############################
+    if game.isGameOver():
+        game_end(red, 3000, "  GAME OVER")
+
+    if game.isGameWin():
+        game_end(blue, 5000, "    ¡GANASTE!")
+
     for event in pygame.event.get():
+        #################  CLOSE WINDOW WITH X BUTTON #####################
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            x, y = event.pos
-            row = y // cell_size
-            col = x // cell_size
 
-            #MODOS DE JUGADOR
-
-            if juego.modo == 'casa':
-                # if juego.cambiar_estado(row, col, 'C', -50):
-                #    sonido_casa.stop()
-                #    sonido_casa.play()
-                if juego.grilla[row][col].tipo == 'T' and hay_calle_adyacente(juego.grilla, row, col):
-                    juego.grilla[row][col].tipo = 'O'
-                    obras[(row, col)] = pygame.time.get_ticks()
-                    juego.dinero -= 50
-                    sonido_casa.stop()
-                    sonido_casa.play()
-
-                else:
-                    mensaje = "¡Debe haber una calle adyacente para construir una casa!"
-                    mensaje_mostrar_hasta = juego.tiempo_actual + 3000
-            elif juego.modo == 'calle' and juego.grilla[row][col].tipo == 'T':
-                juego.grilla[row][col].tipo = 'S'
-                sonido_calle.stop()
-                sonido_calle.play()
-                juego.dinero -= 30
-                mensaje = ""
-            elif juego.modo == 'demoler' and juego.grilla[row][col].tipo == 'C':
-                juego.grilla[row][col].tipo = 'T'
-                sonido_calle.stop()
-                sonido_calle.play()
-                juego.dinero -= 100
-                mensaje = ""
-
-        #TECLAS DE LOS MODOS
-
+        ########################   CHANGE BUILD MODES   ##################################
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_1:
-                juego.modo = 'casa'
+                build_mode = BuildMode.HOUSE
                 mensaje = "CASA"
-                mensaje_mostrar_hasta = juego.tiempo_actual + 1000
+                mensaje_mostrar_hasta = current_time + 1000
             elif event.key == pygame.K_2:
-                juego.modo = 'calle'
+                build_mode = BuildMode.ROAD
                 mensaje = "CALLE"
-                mensaje_mostrar_hasta = juego.tiempo_actual + 1000
+                mensaje_mostrar_hasta = current_time + 1000
             elif event.key == pygame.K_3:
-                juego.modo = 'demoler'
+                build_mode = BuildMode.DEMOLISH
                 mensaje = "DEMOLER"
-                mensaje_mostrar_hasta = juego.tiempo_actual + 1000
-            elif event.key == pygame.K_r:  # Reiniciar el juego con la tecla "R"
-                juego = Juego(1000, 'casa', datetime(1993, 1, 1, 0, 0))
-                obras = {}
-                ultimo_ingreso = pygame.time.get_ticks()
-                ultimo_tornado = pygame.time.get_ticks()
+                mensaje_mostrar_hasta = current_time + 1000
+            elif event.key == pygame.K_r:  # Reset game with "R" key.
+                game = Game()
                 mensaje_mostrar_hasta = 0
                 frame_index_general = 0
                 ultimo_cambio_frame_general = pygame.time.get_ticks()
                 pygame.mixer.music.play(-1)
 
-    juego.actualizar_tiempo(pygame.time.get_ticks())
-    for (row, col), inicio in list(obras.items()):
-        if juego.tiempo_actual - inicio > 10000:
-            juego.grilla[row][col].tipo = 'C'
-            del obras[(row, col)]
+        ########################   CHANGE BUILD MODES   ##################################
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = event.pos
+            row = y // cell_size
+            col = x // cell_size
+            # TODO: FIX BUG OF CLICKING OUTSIDE GRID
 
-    if juego.tiempo_actual - ultimo_ingreso > 5000:
-        for fila in juego.grilla:
-            juego.dinero += sum(celda.tipo == 'C' for celda in fila) * 10
-        ultimo_ingreso = juego.tiempo_actual
+            if build_mode == BuildMode.HOUSE:
+                if game.buildHouse(row, col):
+                    sound_house.stop()
+                    sound_house.play()
+                else:
+                    mensaje = "¡Debe haber una calle adyacente para construir una casa!"
+                    mensaje_mostrar_hasta = current_time + 3000
 
+            elif build_mode == BuildMode.ROAD:
+                if game.buildRoad(row, col):
+                    sound_road.stop()
+                    sound_road.play()
 
-    if juego.tiempo_actual - ultimo_tornado > 30000:
-        sonido_tornado.play()
-        for i in range(random.randint(1, 10)):
-            casas = [
-                (r, c)
-                for r, fila in enumerate(juego.grilla)
-                for c, celda in enumerate(fila) if celda.tipo == 'C'
-            ]
-            if casas:
-                row, col = random.choice(casas)
-                juego.grilla[row][col].tipo = 'O'
-                obras[(row, col)] = pygame.time.get_ticks()
-                juego.dinero -= 20
-        mensaje = "¡Un tornado ha pasado y algunas casas han vuelto a ser obras!"
-        mensaje_mostrar_hasta = juego.tiempo_actual + 5000
-        ultimo_tornado = juego.tiempo_actual
+            elif build_mode == BuildMode.DEMOLISH:
+                if game.demolish(row, col):
+                    sound_road.stop()
+                    sound_road.play()
 
-
-    if random.randint(0, 1500) == 1 and juego.tiempo_actual >= 60000: #probabilidad de terremoto
-        evento_terremoto()
-        mensaje = "¡Terremoto! ¡Las casas vuelven a ser tierra!"
-        mensaje_mostrar_hasta = juego.tiempo_actual + 5000
-
-    juego.actualizar_fecha(timedelta(minutes=1))
-
-    screen.fill(grey)
-    dibujar_grilla(screen, juego.grilla, juego.dinero, mensaje, juego.fecha, juego.tiempo_actual)
-    pygame.display.flip()
-
-    reloj.tick(60)
-
-    if juego.dinero <= 0:
-        screen.fill(red)
-        font = pygame.font.Font(None, 74)
-
-        pygame.mixer.music.stop()
-        sonido_casa.stop()
-        #sonido_tornado.stop()
-        #sonido_terremoto.stop()
-        sonido_perder.play()
-
-        game_over_text = font.render("  GAME OVER", True, white)
-        screen.blit(game_over_text, (width//4, height//2 - 40))
-        pygame.display.flip()
-        pygame.time.wait(3000)
-        pygame.quit()
-        sys.exit()
-
-    if juego.dinero >= 2000:
-        screen.fill(blue)
-        font = pygame.font.Font(None, 74)
-
-        pygame.mixer.music.stop()
-        sonido_casa.stop()
-        sonido_tornado.stop()
-        sonido_terremoto.stop()
-        sonido_ganar.play()
-
-        win_text = font.render("    ¡GANASTE!", True, white)
-        screen.blit(win_text, (width//4, height//2 - 40))
-        pygame.display.flip()
-        pygame.time.wait(5000)
-        pygame.quit()
-        sys.exit()
-
+    ####################### ADDS TICKS TO GAME CLOCK ############################
+    clk.tick(60) # VER QUE SI
