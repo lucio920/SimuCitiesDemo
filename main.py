@@ -19,9 +19,8 @@ pygame.mixer.init()
 
 # Window and cell size
 window_size = width, height = 800, 900
-cell_size = 80 # TODO: ajustar cell_size para redimensionar ventana.
+cell_size = 80
 
-# TODO: pasar a constantes
 # Colores
 black = (0, 0, 0)
 white = (255, 255, 255)
@@ -69,34 +68,28 @@ frames_house = [pygame.transform.scale(img, (cell_size, cell_size)) for img in f
 frames_road = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_road]
 frames_construction = [pygame.transform.scale(img, (cell_size, cell_size)) for img in frames_construction]
 
-## TODO MEJORAR
 # Game window drawing function
 def draw_game(screen, grid, money, date, current_time, constructions, message):
-    global frame_index_general, ultimo_cambio_frame_general
+    global general_frame_index, last_general_frame_change
 
-    if current_time - ultimo_cambio_frame_general > 1000:
-        frame_index_general = (frame_index_general + 1) % len(frames_land)
-        ultimo_cambio_frame_general = current_time
+    if current_time - last_general_frame_change > 1000:
+        general_frame_index = (general_frame_index + 1) % len(frames_land)
+        last_general_frame_change = current_time
 
     for i, fila in enumerate(grid):
         for j, celda in enumerate(fila):
             rect = pygame.Rect(j * cell_size, i * cell_size, cell_size, cell_size)
             if isinstance(celda, Water):
-                screen.blit(frames_water[frame_index_general], rect.topleft)
+                screen.blit(frames_water[general_frame_index], rect.topleft)
             elif isinstance(celda, Land):
-                screen.blit(frames_land[frame_index_general], rect.topleft)
+                screen.blit(frames_land[general_frame_index], rect.topleft)
             elif isinstance(celda, House):
-                screen.blit(frames_house[frame_index_general], rect.topleft)
+                screen.blit(frames_house[general_frame_index], rect.topleft)
             elif isinstance(celda, Road):
-                screen.blit(frames_road[frame_index_general], rect.topleft)
+                screen.blit(frames_road[general_frame_index], rect.topleft)
             elif isinstance(celda, Construction):
-                # TODO: fix the bug, only 8 frames are showed.
-                # This func gets executed 60 times per second. Each second in real life is 1 hour in game time.
-                # This means that each time this function gets called, one minute has passed
-                # There are 10 frames for a construction site. For simplicity, the sites turn into houses in 10 hours.
                 start_date = constructions.get((i, j), date)
                 frame_index_obra = min(int((date - start_date).total_seconds()/3600), len(frames_construction) - 1)
-                print(frame_index_obra)
                 screen.blit(frames_construction[frame_index_obra], rect.topleft)
             pygame.draw.rect(screen, black, rect, 1)
 
@@ -105,10 +98,10 @@ def draw_game(screen, grid, money, date, current_time, constructions, message):
     screen.blit(dinero_text, (10, height - 100))
 
 
-    if mensaje and current_time <= mensaje_mostrar_hasta:
-        alpha = int(255 * (mensaje_mostrar_hasta - current_time) / 5000)
-        mensaje_text = font.render(mensaje, True, (light_blue[0], light_blue[1], light_blue[2], alpha),grey)
-        screen.blit(mensaje_text, (10, height - 130))
+    if message and current_time <= show_message_until:
+        alpha = int(255 * (show_message_until - current_time) / 5000)
+        message_text = font.render(message, True, (light_blue[0], light_blue[1], light_blue[2], alpha),grey)
+        screen.blit(message_text, (10, height - 130))
 
     controles_text = font.render("[1]-Casa($50)     [2]-Calle($30)      [3]-Demoler($100)   [R]-Reiniciar", True, white)
     screen.blit(controles_text, (10, height - 70))
@@ -143,12 +136,11 @@ game = Game()
 BuildMode = Enum('BuildMode', ['HOUSE', 'ROAD', 'DEMOLISH'])
 build_mode = BuildMode.HOUSE # Default mode
 
-# Mantener un registro del tiempo de construcción y ganancias
-ultimo_tornado = pygame.time.get_ticks()
-mensaje_mostrar_hasta = 0
-frame_index_general = 0
-mensaje = ''
-ultimo_cambio_frame_general = pygame.time.get_ticks()
+# UI Message and frame change helper variables
+message = ''
+show_message_until = 0
+general_frame_index = 0
+last_general_frame_change = pygame.time.get_ticks()
 
 
 ############################################################
@@ -165,18 +157,18 @@ while True:
     ################### NATURAL DISASTERS CHECK ##############################
     if game.hasTornadoPassed():
         sound_tornado.play()
-        mensaje = "¡Un tornado ha pasado y algunas casas han vuelto a ser obras!"
-        mensaje_mostrar_hasta = current_time + 5000
+        message = "¡Un tornado ha pasado y algunas casas han vuelto a ser obras!"
+        show_message_until = current_time + 5000
 
     if game.hasEarthquakePassed():
         sound_earthquake.play()
-        mensaje = "¡Terremoto! ¡Las casas vuelven a ser tierra!"
-        mensaje_mostrar_hasta = current_time + 5000
+        message = "¡Terremoto! ¡Las casas vuelven a ser tierra!"
+        show_message_until = current_time + 5000
 
     ##################  UPDATES SCREEEEN ##########################
     screen.fill(grey)
     (grid, money, date, constructions) = game.getGameData()
-    draw_game(screen, grid, money, date, current_time, constructions, mensaje)
+    draw_game(screen, grid, money, date, current_time, constructions, message)
     pygame.display.flip()
 
     ######################## GAME FINISH CHECKS ############################
@@ -196,21 +188,21 @@ while True:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_1:
                 build_mode = BuildMode.HOUSE
-                mensaje = "CASA"
-                mensaje_mostrar_hasta = current_time + 1000
+                message = "CASA"
+                show_message_until = current_time + 1000
             elif event.key == pygame.K_2:
                 build_mode = BuildMode.ROAD
-                mensaje = "CALLE"
-                mensaje_mostrar_hasta = current_time + 1000
+                message = "CALLE"
+                show_message_until = current_time + 1000
             elif event.key == pygame.K_3:
                 build_mode = BuildMode.DEMOLISH
-                mensaje = "DEMOLER"
-                mensaje_mostrar_hasta = current_time + 1000
+                message = "DEMOLER"
+                show_message_until = current_time + 1000
             elif event.key == pygame.K_r:  # Reset game with "R" key.
                 game = Game()
-                mensaje_mostrar_hasta = 0
-                frame_index_general = 0
-                ultimo_cambio_frame_general = pygame.time.get_ticks()
+                show_message_until = 0
+                general_frame_index = 0
+                last_general_frame_change = pygame.time.get_ticks()
                 pygame.mixer.music.play(-1)
 
         ########################   CHANGE BUILD MODES   ##################################
@@ -225,18 +217,24 @@ while True:
                     sound_house.stop()
                     sound_house.play()
                 else:
-                    mensaje = "¡Debe haber una calle adyacente para construir una casa!"
-                    mensaje_mostrar_hasta = current_time + 3000
+                    message = "¡Debe haber una calle adyacente para construir una casa!"
+                    show_message_until = current_time + 3000
 
             elif build_mode == BuildMode.ROAD:
                 if game.buildRoad(row, col):
                     sound_road.stop()
                     sound_road.play()
+                else:
+                    message = "¡La calle debe construirse sobre tierra!"
+                    show_message_until = current_time + 3000
 
             elif build_mode == BuildMode.DEMOLISH:
                 if game.demolish(row, col):
                     sound_road.stop()
                     sound_road.play()
+                else:
+                    message = "¡Solo se puede demoler casas terminadas!"
+                    show_message_until = current_time + 3000
 
     ####################### ADDS TICKS TO GAME CLOCK ############################
     clk.tick(60) # VER QUE SI
