@@ -12,8 +12,12 @@ class Land(Cell):
         super().__init__(100)
 
 class House(Cell):
-    def __init__(self):
+    def __init__(self, tax=10):
+        self.__tax = tax
         super().__init__(0)
+
+    def payTaxes(self):
+        return self.__tax
 
 class Road(Cell):
     def __init__(self):

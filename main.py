@@ -215,7 +215,12 @@ while True:
             x, y = event.pos
             row = y // cell_size
             col = x // cell_size
-            # TODO: FIX BUG OF CLICKING OUTSIDE GRID
+            """
+            if col >= 10 or row >= 10:
+                continue
+            """
+
+
 
             if build_mode == BuildMode.HOUSE:
                 if game.buildHouse(row, col):

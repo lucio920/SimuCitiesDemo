@@ -97,18 +97,16 @@ class Game:
     def __advanceContructionSites(self):
         for (row, col), startDate in list(self.__constructions.items()):
             if self.__date - startDate >= timedelta(hours=10):
-                self.__advanceCell(row, col, House())
+                self.__advanceCell(row, col, House(20))
                 del self.__constructions[(row, col)]
 
-    # __collectTaxes increases the amount of money for each cell, being the amount managed by each cell.
+    # __collectTaxes increases the amount of money for each house built.
     def __collectTaxes(self):
         if self.__date - self.__lastTaxCollectionDate > timedelta(hours=5):
             for row in self.__grid:
-                self.__money += sum(isinstance(cell, House) for cell in row) * 10 # 10 simoleons for each house built.
+                self.__money += sum(cell.payTaxes() for cell in row if isinstance(cell, House))
             self.__lastTaxCollectionDate = self.__date
 
-    # TODO: QUIZAS HACER QUE LAS CELDAS CONOZCAN SUS ADYACENTES Y PASAR ESTA LOGICA DIRECTO A LA CELDA
-    #  (POR EJEMPLO QUE CELDA TENGA UN METODO "canBuild()" que devuelva un booleano, y cada tipo de celda lo implemente a su gusto)?
     # __isStreetAdjacent returns a boolean if the cell by its given coordinates row, col is adjacent to at least one road type cell.
     def __isStreetAdjacent(self, row, col):
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
